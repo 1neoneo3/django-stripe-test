@@ -18,7 +18,7 @@ class Search(models.Model):
         related_name='search_set',
         related_query_name='search'
     )
-    created_on = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.tagname

@@ -1,13 +1,16 @@
 from .models import Tag, Search
 from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
 import pandas as pd
 import requests
 import json
 import itertools
 import re
-from rest_framework.views import APIView
-from rest_framework.response import Response
-
 
 def get_credentials():
     credentials = {}
@@ -15,8 +18,7 @@ def get_credentials():
     credentials['instagram_account_id'] = settings.USER_ID
     credentials['graph_domain'] = 'https://graph.facebook.com/'
     credentials['graph_version'] = 'v9.0'
-    credentials['endpoint_base'] = credentials['graph_domain'] + \
-        credentials['graph_version'] + '/'
+    credentials['endpoint_base'] = credentials['graph_domain'] + credentials['graph_version'] + '/'
     return credentials
 
 
@@ -65,6 +67,8 @@ class SearchView(APIView):
             search_data = Search.objects.filter(tagname=tagname)
             if search_data:
                 search_data = search_data[0]
+                if search_data.created_at < (timezone.now() - timedelta(weeks=1)):
+                    print('一週間以上経過しているのでハッシュタグを再取得する')
             else:
                 # Instagram Graph API認証情報取得
                 params = get_credentials()
@@ -82,8 +86,7 @@ class SearchView(APIView):
                 for i in range(len(hashag_data)):
                     if hashag_data[i].get('caption'):
                         caption = hashag_data[i]["caption"]
-                        hash_tag_list = re.findall(
-                            '#([^\s→#\ufeff]*)', caption)
+                        hash_tag_list = re.findall('#([^\s→#\ufeff]*)', caption)
                         if hash_tag_list:
                             hashtag_group.append(hash_tag_list)
 
@@ -95,18 +98,17 @@ class SearchView(APIView):
 
                 for i, (hashtag, hashtag_count) in enumerate(zip(data.index, data.values)):
                     # TOP30取得
-                    if i > 29:
+                    if i >= 30:
                         break
                     else:
-                        tag_data = Tag.objects.create(
-                            hashtag=hashtag, hashtag_count=hashtag_count)
+                        tag_data = Tag.objects.create(hashtag=hashtag, hashtag_count=hashtag_count)
                         search_data.ranking.add(tag_data)
                         search_data.save()
 
             results.append({
                 'tagname': search_data.tagname,
                 'ranking': list(search_data.ranking.all().values('hashtag', 'hashtag_count')),
-                'created_on': search_data.created_on,
+                'created_at': search_data.created_at,
             })
 
         return ApiResponse(
