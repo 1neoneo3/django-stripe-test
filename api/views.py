@@ -68,7 +68,7 @@ class SearchView(APIView):
             if search_data:
                 search_data = search_data[0]
                 if search_data.created_at < (timezone.now() - timedelta(weeks=1)):
-                    print('一週間以上経過しているのでハッシュタグを再取得する')
+                    print('一週間以上経過しているのでハッシュタグの再取得')
             else:
                 # Instagram Graph API認証情報取得
                 params = get_credentials()
