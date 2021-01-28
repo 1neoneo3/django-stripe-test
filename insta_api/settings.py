@@ -25,9 +25,9 @@ BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 SECRET_KEY = '!ets0hi8d-9@1m$%x_#8j_&_88(uxluc!8=1czwu0g3eh6^tvw'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -125,13 +125,23 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
-import environ
+try:
+    from .local_settings import *
+except ImportError:
+    pass
+
 import os
 
-env = environ.Env()
-env.read_env(os.path.join(BASE_DIR, '.env'))
-
-ACCESS_TOKEN = env('ACCESS_TOKEN')
-USER_ID = env('USER_ID')
-
-CORS_ORIGIN_WHITELIST = ['http://localhost:3001']
+if DEBUG:
+    import environ
+    env = environ.Env()
+    env.read_env(os.path.join(BASE_DIR, '.env'))
+    ACCESS_TOKEN = env('ACCESS_TOKEN')
+    USER_ID = env('USER_ID')
+    CORS_ORIGIN_WHITELIST = ['http://localhost:3001']
+else:
+    import django_heroku
+    ACCESS_TOKEN = os.environ["ACCESS_TOKEN"]
+    USER_ID = os.environ["USER_ID"]
+    CORS_ORIGIN_WHITELIST = ['http://localhost:3001']
+    django_heroku.settings(locals())
