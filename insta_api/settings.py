@@ -143,5 +143,5 @@ else:
     import django_heroku
     ACCESS_TOKEN = os.environ["ACCESS_TOKEN"]
     USER_ID = os.environ["USER_ID"]
-    CORS_ORIGIN_WHITELIST = ['http://localhost:3001']
+    CORS_ORIGIN_WHITELIST = ['https://insta-analytics-841ef.web.app']
     django_heroku.settings(locals())
