@@ -14,8 +14,6 @@ import re
 
 def get_credentials():
     credentials = {}
-    credentials['access_token'] = settings.ACCESS_TOKEN
-    credentials['instagram_account_id'] = settings.USER_ID
     credentials['graph_domain'] = 'https://graph.facebook.com/'
     credentials['graph_version'] = 'v9.0'
     credentials['endpoint_base'] = credentials['graph_domain'] + credentials['graph_version'] + '/'
@@ -63,7 +61,9 @@ class SearchView(APIView):
     def get(self, request):
         results = []
         tagname = request.GET.get(key="tagname")
-        if tagname:
+        access_token = request.GET.get(key="access_token")
+        instagram_account_id = request.GET.get(key="instagram_account_id")
+        if tagname and access_token and instagram_account_id:
             search_data = Search.objects.filter(tagname=tagname)
             if search_data:
                 search_data = search_data[0]
@@ -72,6 +72,9 @@ class SearchView(APIView):
             else:
                 # Instagram Graph API認証情報取得
                 params = get_credentials()
+                params['access_token'] = access_token
+                params['instagram_account_id'] = instagram_account_id
+
                 # ハッシュタグ設定
                 params['tagname'] = tagname
                 # ハッシュタグID取得

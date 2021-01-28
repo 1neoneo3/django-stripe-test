@@ -133,15 +133,15 @@ except ImportError:
 import os
 
 if DEBUG:
-    import environ
-    env = environ.Env()
-    env.read_env(os.path.join(BASE_DIR, '.env'))
-    ACCESS_TOKEN = env('ACCESS_TOKEN')
-    USER_ID = env('USER_ID')
+    # import environ
+    # env = environ.Env()
+    # env.read_env(os.path.join(BASE_DIR, '.env'))
+    # ACCESS_TOKEN = env('ACCESS_TOKEN')
+    # USER_ID = env('USER_ID')
     CORS_ORIGIN_WHITELIST = ['http://localhost:3001']
 else:
     import django_heroku
-    ACCESS_TOKEN = os.environ["ACCESS_TOKEN"]
-    USER_ID = os.environ["USER_ID"]
+    # ACCESS_TOKEN = os.environ["ACCESS_TOKEN"]
+    # USER_ID = os.environ["USER_ID"]
     CORS_ORIGIN_WHITELIST = ['https://insta-analytics-841ef.web.app']
     django_heroku.settings(locals())
