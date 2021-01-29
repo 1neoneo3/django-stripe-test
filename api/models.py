@@ -2,11 +2,12 @@ from django.db import models
 
 
 class Tag(models.Model):
+    tagname = models.CharField(max_length=100)
     hashtag = models.CharField(max_length=100)
     hashtag_count = models.IntegerField()
 
     def __str__(self):
-        return self.hashtag
+        return self.tagname
 
 class Search(models.Model):
     tagname = models.CharField(max_length=100)
