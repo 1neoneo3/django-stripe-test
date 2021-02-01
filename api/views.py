@@ -46,7 +46,7 @@ def get_hashtag_media(params):
     endpoint_params = {}
     endpoint_params['user_id'] = params['instagram_account_id']
     endpoint_params['fields'] = 'caption'
-    endpoint_params['limit'] = 50
+    # endpoint_params['limit'] = 50
     endpoint_params['access_token'] = params['access_token']
     url = params['endpoint_base'] + params['hashtag_id'] + '/top_media'
     return call_api(url, endpoint_params)
