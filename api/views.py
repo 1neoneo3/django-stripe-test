@@ -58,7 +58,7 @@ def get_account_info(params):
     # ユーザ名、プロフィール画像、フォロワー数、フォロー数、投稿数、メディア情報取得
     endpoint_params['fields'] = 'business_discovery.username(' + params['ig_username'] + '){\
         username,biography,profile_picture_url,follows_count,followers_count,media_count,\
-        media.limit(10){comments_count,like_count,caption,media_url,permalink,timestamp,media_type}}'
+        media.limit(100){comments_count,like_count,caption,media_url,permalink,timestamp,media_type}}'
     endpoint_params['access_token'] = params['access_token']
     url = params['endpoint_base'] + params['instagram_account_id']
     return call_api(url, endpoint_params)
@@ -140,9 +140,15 @@ class SearchView(APIView):
 class AccountView(APIView):
     def get(self, request):
         params = get_credentials()
+        ig_username = request.GET.get(key="ig_username")
+
+        # 本番用
+        access_token = request.GET.get(key="access_token")
+        instagram_account_id = request.GET.get(key="instagram_account_id")
+
+        # ローカルで確認する場合は下記のコメントアウトを外す(.envが必要)
         access_token = settings.ACCESS_TOKEN
         instagram_account_id = settings.USER_ID
-        ig_username = 'yumedaruma'
 
         params['access_token'] = access_token
         params['instagram_account_id'] = instagram_account_id
@@ -158,24 +164,26 @@ class AccountView(APIView):
         media_count = business_discovery['media_count']
         media_data = business_discovery['media']['data']
 
+        # 最近の投稿を取得
         recently_data = []
         for i in range(6):
-            tags = re.findall('#([^\s→#\ufeff]*)', media_data[i]['caption'])
-            tags = [a for a in tags if a != '']
-            tags = map(lambda x: '#' + x, tags)
-            tags = ' '.join(tags)
+            if media_data[i].get('media_url'):
+                tags = re.findall('#([^\s→#\ufeff]*)', media_data[i]['caption'])
+                tags = [a for a in tags if a != '']
+                tags = map(lambda x: '#' + x, tags)
+                tags = ' '.join(tags)
 
-            timestamp = (datetime.strptime(media_data[i]['timestamp'], '%Y-%m-%dT%H:%M:%S%z')).strftime("%Y-%m-%d %H:%M")
+                timestamp = (datetime.strptime(media_data[i]['timestamp'], '%Y-%m-%dT%H:%M:%S%z')).strftime("%Y-%m-%d %H:%M")
 
-            recently_data.append({
-                'media_url': media_data[i]['media_url'],
-                'permalink': media_data[i]['permalink'],
-                'timestamp': timestamp,
-                'like_count': media_data[i]['like_count'],
-                'comments_count': media_data[i]['comments_count'],
-                'permalink': media_data[i]['permalink'],
-                'tags': tags
-            })
+                recently_data.append({
+                    'media_url': media_data[i]['media_url'],
+                    'permalink': media_data[i]['permalink'],
+                    'timestamp': timestamp,
+                    'like_count': media_data[i]['like_count'],
+                    'comments_count': media_data[i]['comments_count'],
+                    'permalink': media_data[i]['permalink'],
+                    'tags': tags
+                })
 
         # データフレームの作成
         media_data_frame = pd.DataFrame(media_data, columns=[
@@ -189,14 +197,21 @@ class AccountView(APIView):
             'id',
         ])
 
+        # VIDEOはmedia_urlが取得できないため削除
+        media_data_frame = media_data_frame[media_data_frame['media_type'] != 'VIDEO']
+
+        # ハッシュタグを合わせる
         row_count = media_data_frame['caption'].str.extractall('#([^\s→#\ufeff]*)').reset_index(level=0).drop_duplicates()[0]
+        # ハッシュタグが含まれている投稿件数
         hashtag_count = row_count.value_counts().to_dict()
 
+        # ハッシュタグ毎にデータを作成
         hashtag_data = []
         for key, val in hashtag_count.items():
-            post_data = media_data_frame[media_data_frame['caption'].str.contains(key)]
+            post_data = media_data_frame[media_data_frame['caption'].str.contains(key, na=False)]
             hashag_post_data = []
             average_eng = 0
+            average_eng_percent = 0
             for index, row in post_data.iterrows():
                 timestamp = (datetime.strptime(row['timestamp'], '%Y-%m-%dT%H:%M:%S%z')).strftime("%Y-%m-%d %H:%M")
 
@@ -209,8 +224,9 @@ class AccountView(APIView):
                 })
                 average_eng += row['like_count'] + row['comments_count']
 
-            average_eng = int(average_eng / val)
-            average_eng_percent = round(average_eng / follows_count, 1)
+            if average_eng:
+                average_eng = int(average_eng / val)
+                average_eng_percent = round(average_eng / follows_count, 1)
 
             hashtag_data.append({
                 'hashtag': key,
