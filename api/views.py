@@ -147,8 +147,8 @@ class AccountView(APIView):
         instagram_account_id = request.GET.get(key="instagram_account_id")
 
         # ローカルで確認する場合は下記のコメントアウトを外す(.envが必要)
-        access_token = settings.ACCESS_TOKEN
-        instagram_account_id = settings.USER_ID
+        # access_token = settings.ACCESS_TOKEN
+        # instagram_account_id = settings.USER_ID
 
         params['access_token'] = access_token
         params['instagram_account_id'] = instagram_account_id
