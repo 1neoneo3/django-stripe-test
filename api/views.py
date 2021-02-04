@@ -208,7 +208,7 @@ class AccountView(APIView):
         # ハッシュタグ毎にデータを作成
         hashtag_data = []
         for key, val in hashtag_count.items():
-            post_data = media_data_frame[media_data_frame['caption'].str.contains(key, na=False)]
+            post_data = media_data_frame[media_data_frame['caption'].str.contains('#' + key, na=False)]
             hashag_post_data = []
             average_eng = 0
             average_eng_percent = 0
