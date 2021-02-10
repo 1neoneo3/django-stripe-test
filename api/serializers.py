@@ -1,5 +1,34 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Tag, Search
+from .models import Tag, Search, Profile, Benchmark
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = get_user_model()
+        fields = ('id', 'email', 'password')
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = get_user_model().objects.create_user(**validated_data)
+        return user
+
+
+class BenchmarkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Benchmark
+        fields = ('name', 'profile_picture_url', 'followers_count', 'media_count')
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    created_on = serializers.DateTimeField(format='%Y-%m-%d', read_only=True)
+    benchmark = BenchmarkSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Profile
+        fields = ('id', 'nickName', 'userProfile', 'accessToken', 'instagramBusinessID', 'created_on', 'benchmark')
+        extra_kwargs = {'userProfile': {'read_only': True}}
+
 
 
 class TagSerializer(serializers.ModelSerializer):

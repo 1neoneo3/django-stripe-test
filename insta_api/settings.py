@@ -39,9 +39,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'api',
     'corsheaders',
     'rest_framework',
-    'api.apps.ApiConfig',
+    'djoser',
 ]
 
 MIDDLEWARE = [
@@ -74,6 +75,20 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'insta_api.wsgi.application'
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ]
+}
+
+SIMPLE_JWT = {
+    'AUTH_HEADER_TYPES': ('JWT',),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
+}
 
 
 # Database
@@ -125,20 +140,18 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+AUTH_USER_MODEL = 'api.User'
+
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = '/media/'
+
 try:
     from .local_settings import *
 except ImportError:
     pass
 
-import os
-
 if DEBUG:
-    import environ
-    env = environ.Env()
-    env.read_env(os.path.join(BASE_DIR, '.env'))
-    ACCESS_TOKEN = env('ACCESS_TOKEN')
-    USER_ID = env('USER_ID')
-    CORS_ORIGIN_WHITELIST = ['http://localhost:3001']
+    CORS_ORIGIN_WHITELIST = ['http://localhost:3000']
 else:
     import django_heroku
     CORS_ORIGIN_WHITELIST = ['https://insta-analytics-841ef.web.app']

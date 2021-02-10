@@ -1,20 +1,49 @@
-from .models import Tag, Search
 from django.conf import settings
 from django.utils import timezone
+from django.shortcuts import render
+from django.contrib.auth.models import User
+
+from .models import Tag, Search, Profile, Benchmark
 from datetime import datetime, timedelta
 
 from rest_framework.views import APIView
+from rest_framework import status, permissions, generics, viewsets
 from rest_framework.response import Response
-from rest_framework import status
 from . import serializers
 
 import pandas as pd
 import requests
 import json
+import numpy as np
 import itertools
 import re
 
 
+# ユーザー作成
+class CreateUserView(generics.CreateAPIView):
+    serializer_class = serializers.UserSerializer
+    permission_classes = (permissions.AllowAny,)
+
+
+# プロフィール関連
+class ProfileViewSet(viewsets.ModelViewSet):
+    queryset = Profile.objects.all()
+    serializer_class = serializers.ProfileSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(userProfile=self.request.user)
+
+
+# 全プロフィールリスト取得
+class MyProfileListView(generics.ListAPIView):
+    queryset = Profile.objects.all()
+    serializer_class = serializers.ProfileSerializer
+
+    def get_queryset(self):
+        return self.queryset.filter(userProfile=self.request.user)
+
+
+# 認証
 def get_credentials():
     credentials = {}
     credentials['graph_domain'] = 'https://graph.facebook.com/'
@@ -27,8 +56,46 @@ def get_credentials():
 def call_api(url, endpoint_params):
     data = requests.get(url, endpoint_params)
     response = {}
-    response['json_data'] = json.loads(data.content)
+    if data.status_code == requests.codes.ok:
+        response['json_data'] = json.loads(data.content)
     return response
+
+
+# 長期アクセストークン取得
+def get_long_access_token(params):
+    endpoint_params = {}
+    endpoint_params['fb_exchange_token'] = params['access_token']
+    endpoint_params['grant_type'] = 'fb_exchange_token'
+    endpoint_params['client_id'] = '1712895282220029'
+    endpoint_params['client_secret'] = '183befdc6dac90ca608d1b0ee5027010' # 環境変数にする
+    url = params['endpoint_base'] + 'oauth/access_token'
+    return call_api(url, endpoint_params)
+
+
+# FacebookPageID取得
+def get_facebook_page_id(params):
+    endpoint_params = {}
+    endpoint_params['access_token'] = params['access_token']
+    url = params['endpoint_base'] + 'me/accounts'
+    return call_api(url, endpoint_params)
+
+
+# Instagram Business ID取得
+def get_instagram_business_id(params):
+    endpoint_params = {}
+    endpoint_params['fields'] = 'instagram_business_account'
+    endpoint_params['access_token'] = params['access_token']
+    url = params['endpoint_base'] + params['facebook_page_id']
+    return call_api(url, endpoint_params)
+
+
+# Instagram ユーザー名取得
+def get_username(params):
+    endpoint_params = {}
+    endpoint_params['fields'] = 'username'
+    endpoint_params['access_token'] = params['access_token']
+    url = params['endpoint_base'] + params['instagram_business_id']
+    return call_api(url, endpoint_params)
 
 
 # ハッシュタグID取得
@@ -45,8 +112,7 @@ def get_hashtag_id(params):
 def get_hashtag_media(params):
     endpoint_params = {}
     endpoint_params['user_id'] = params['instagram_account_id']
-    endpoint_params['fields'] = 'caption'
-    # endpoint_params['limit'] = 50
+    endpoint_params['fields'] = 'caption,comments_count,like_count,media_url,permalink'
     endpoint_params['access_token'] = params['access_token']
     url = params['endpoint_base'] + params['hashtag_id'] + '/top_media'
     return call_api(url, endpoint_params)
@@ -58,12 +124,145 @@ def get_account_info(params):
     # ユーザ名、プロフィール画像、フォロワー数、フォロー数、投稿数、メディア情報取得
     endpoint_params['fields'] = 'business_discovery.username(' + params['ig_username'] + '){\
         username,biography,profile_picture_url,follows_count,followers_count,media_count,\
-        media.limit(100){comments_count,like_count,caption,media_url,permalink,timestamp,media_type}}'
+        media.limit(' + params['limit'] + '){comments_count,like_count,caption,media_url,permalink,timestamp,media_type}}'
     endpoint_params['access_token'] = params['access_token']
     url = params['endpoint_base'] + params['instagram_account_id']
     return call_api(url, endpoint_params)
 
 
+# メディアインサイト情報取得
+def get_media_insights(params):
+    endpoint_params = {}
+    endpoint_params['metric'] = 'engagement,impressions,reach,saved'
+    endpoint_params['access_token'] = params['access_token']
+    url = params['endpoint_base'] + params['media_id'] + '/insights'
+    return call_api(url, endpoint_params)
+
+
+# ユーザーインサイト情報取得
+def get_user_insights(params):
+    endpoint_params = {}
+    endpoint_params['metric'] = 'impressions,reach,follower_count,profile_views,website_clicks'
+    endpoint_params['period'] = 'day'
+    endpoint_params['since'] = params['since']
+    endpoint_params['until'] = params['until']
+    endpoint_params['access_token'] = params['access_token']
+    url = params['endpoint_base'] + params['instagram_account_id'] + '/insights'
+    return call_api(url, endpoint_params)
+
+
+# オンラインフォロワーインサイト情報取得
+def get_online_followers_insights(params):
+    endpoint_params = {}
+    endpoint_params['metric'] = 'online_followers'
+    endpoint_params['period'] = 'lifetime'
+    endpoint_params['since'] = params['since']
+    endpoint_params['until'] = params['until']
+    endpoint_params['access_token'] = params['access_token']
+    url = params['endpoint_base'] + params['instagram_account_id'] + '/insights'
+    return call_api(url, endpoint_params)
+
+
+# オーディエンスインサイト情報取得
+def get_audience_insights(params):
+    endpoint_params = {}
+    endpoint_params['metric'] = 'audience_city,audience_country,audience_gender_age'
+    endpoint_params['period'] = 'lifetime'
+    endpoint_params['access_token'] = params['access_token']
+    url = params['endpoint_base'] + params['instagram_account_id'] + '/insights'
+    return call_api(url, endpoint_params)
+
+
+# ストーリー情報取得
+def get_stories(params):
+    endpoint_params = {}
+    endpoint_params['access_token'] = params['access_token']
+    url = params['endpoint_base'] + params['instagram_account_id'] + '/stories'
+    return call_api(url, endpoint_params)
+
+
+# メディア情報取得
+def get_media_info(params):
+    endpoint_params = {}
+    endpoint_params['fields'] = 'media_type,media_url,timestamp,caption'
+    endpoint_params['access_token'] = params['access_token']
+    url = params['endpoint_base'] + params['media_id']
+    return call_api(url, endpoint_params)
+
+
+# ストーリーメディアインサイト情報取得
+def get_story_media_insights(params):
+    endpoint_params = {}
+    endpoint_params['metric'] = 'impressions,reach,replies,taps_forward,taps_back,exits'
+    endpoint_params['access_token'] = params['access_token']
+    url = params['endpoint_base'] + params['media_id'] + '/insights'
+    return call_api(url, endpoint_params)
+
+
+# ユーザー情報取得
+def get_profile_data(userProfile):
+    params = get_credentials()
+    profile_data = Profile.objects.get(userProfile=userProfile)
+    params['access_token'] = profile_data.accessToken
+    params['instagram_account_id'] = profile_data.instagramBusinessID
+    params['ig_username'] = profile_data.nickName
+
+    return params
+
+
+# プロフィール作成
+class TokenView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        params = get_credentials()
+        access_token = request.GET.get(key="access_token")
+        user_id = request.GET.get(key="user_id")
+
+        params['access_token'] = access_token
+        long_access_token = get_long_access_token(params)
+        params['access_token'] = long_access_token['json_data']['access_token']
+        facebook_page_id = get_facebook_page_id(params)
+        params['facebook_page_id'] = facebook_page_id['json_data']['data'][0]['id']
+        instagram_business_id = get_instagram_business_id(params)
+        params['instagram_business_id'] = instagram_business_id['json_data']['instagram_business_account']['id']
+        username = get_username(params)
+        params['username'] = username['json_data']['username']
+
+        profile_data = Profile.objects.get(userProfile=user_id)
+        profile_data.nickName = params['username']
+        profile_data.accessToken = params['access_token']
+        profile_data.instagramBusinessID = params['instagram_business_id']
+        profile_data.save()
+
+        response_data = {}
+
+        return Response(response_data)
+
+
+# プロフィール作成(仮) アプリレビューまで
+class TokenBetaView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        params = get_credentials()
+        access_token = request.GET.get(key="access_token")
+        instagram_business_id = request.GET.get(key="instagram_business_id")
+        username = request.GET.get(key="username")
+        user_id = request.GET.get(key="user_id")
+
+        profile_data = Profile.objects.get(userProfile=user_id)
+        profile_data.nickName = username
+        profile_data.accessToken = access_token
+        profile_data.instagramBusinessID = instagram_business_id
+        profile_data.save()
+
+        response_data = {}
+
+        return Response(response_data)
+
+
+# ハッシュタグ検索
 class SearchView(APIView):
     def get_hashtag(self, tagname, access_token, instagram_account_id):
         # Instagram Graph API認証情報取得
@@ -100,7 +299,8 @@ class SearchView(APIView):
             if i >= 30:
                 break
             else:
-                tag_data = Tag.objects.create(tagname=tagname, hashtag=hashtag, hashtag_count=hashtag_count)
+                tag_data = Tag.objects.create(
+                    tagname=tagname, hashtag=hashtag, hashtag_count=hashtag_count)
                 search_data.ranking.add(tag_data)
                 search_data.save()
         return search_data
@@ -108,14 +308,11 @@ class SearchView(APIView):
     def get(self, request):
         results = []
         tagname = request.GET.get(key="tagname")
+        userProfile = request.GET.get(key="userProfile")
 
-        # 本番用
-        access_token = request.GET.get(key="access_token")
-        instagram_account_id = request.GET.get(key="instagram_account_id")
-
-        # ローカルで確認する場合は下記のコメントアウトを外す(.envが必要)
-        # access_token = settings.ACCESS_TOKEN
-        # instagram_account_id = settings.USER_ID
+        profile_data = Profile.objects.get(userProfile=userProfile)
+        access_token = profile_data.accessToken
+        instagram_account_id = profile_data.instagramBusinessID
 
         if tagname and access_token and instagram_account_id:
             search_data = Search.objects.filter(tagname=tagname)
@@ -128,31 +325,31 @@ class SearchView(APIView):
                     search_data.delete()
                     tag_data = Tag.objects.filter(tagname=tagname)
                     tag_data.delete()
-                    search_data = self.get_hashtag(tagname, access_token, instagram_account_id)
+                    search_data = self.get_hashtag(
+                        tagname, access_token, instagram_account_id)
             else:
-                search_data = self.get_hashtag(tagname, access_token, instagram_account_id)
+                search_data = self.get_hashtag(
+                    tagname, access_token, instagram_account_id)
 
             search_serializer = serializers.SearchSerializer(search_data)
             return Response(search_serializer.data)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
+# ベンチマーク情報取得
 class AccountView(APIView):
     def get(self, request):
         params = get_credentials()
         ig_username = request.GET.get(key="ig_username")
+        userProfile = request.GET.get(key="userProfile")
+        is_search = request.GET.get(key="is_search")
 
-        # 本番用
-        access_token = request.GET.get(key="access_token")
-        instagram_account_id = request.GET.get(key="instagram_account_id")
-
-        # ローカルで確認する場合は下記のコメントアウトを外す(.envが必要)
-        # access_token = settings.ACCESS_TOKEN
-        # instagram_account_id = settings.USER_ID
-
-        params['access_token'] = access_token
-        params['instagram_account_id'] = instagram_account_id
+        params = get_credentials()
+        profile_data = Profile.objects.get(userProfile=userProfile)
+        params['access_token'] = profile_data.accessToken
+        params['instagram_account_id'] = profile_data.instagramBusinessID
         params['ig_username'] = ig_username
+        params['limit'] = '100'
 
         account_response = get_account_info(params)
         business_discovery = account_response['json_data']['business_discovery']
@@ -164,16 +361,32 @@ class AccountView(APIView):
         media_count = business_discovery['media_count']
         media_data = business_discovery['media']['data']
 
+        benchmark_data, created = Benchmark.objects.update_or_create(
+            name=username,
+            defaults={
+                'name': username,
+                'profile_picture_url': profile_picture_url,
+                'followers_count': followers_count,
+                'media_count': media_count,
+            }
+        )
+        if is_search == 'true':
+            profile_data.benchmark.add(benchmark_data)
+            profile_data.save()
+
         # 最近の投稿を取得
         recently_data = []
         for i in range(6):
             if media_data[i].get('media_url'):
-                tags = re.findall('#([^\s→#\ufeff]*)', media_data[i]['caption'])
+                tags = re.findall('#([^\s→#\ufeff]*)',
+                                  media_data[i]['caption'])
                 tags = [a for a in tags if a != '']
                 tags = map(lambda x: '#' + x, tags)
                 tags = ' '.join(tags)
 
-                timestamp = (datetime.strptime(media_data[i]['timestamp'], '%Y-%m-%dT%H:%M:%S%z')).strftime("%Y-%m-%d %H:%M")
+                timestamp = timezone.localtime(datetime.strptime(
+                    media_data[i]['timestamp'], '%Y-%m-%dT%H:%M:%S%z'))
+                timestamp = timestamp.strftime("%Y-%m-%d %H:%M")
 
                 recently_data.append({
                     'media_url': media_data[i]['media_url'],
@@ -201,19 +414,22 @@ class AccountView(APIView):
         media_data_frame = media_data_frame[media_data_frame['media_type'] != 'VIDEO']
 
         # ハッシュタグを合わせる
-        row_count = media_data_frame['caption'].str.extractall('#([^\s→#\ufeff]*)').reset_index(level=0).drop_duplicates()[0]
+        row_count = media_data_frame['caption'].str.extractall(
+            '#([^\s→#\ufeff]*)').reset_index(level=0).drop_duplicates()[0]
         # ハッシュタグが含まれている投稿件数
         hashtag_count = row_count.value_counts().to_dict()
 
         # ハッシュタグ毎にデータを作成
         hashtag_data = []
         for key, val in hashtag_count.items():
-            post_data = media_data_frame[media_data_frame['caption'].str.contains('#' + key, na=False)]
+            post_data = media_data_frame[media_data_frame['caption'].str.contains(
+                '#' + key, na=False)]
             hashag_post_data = []
             average_eng = 0
             average_eng_percent = 0
             for index, row in post_data.iterrows():
-                timestamp = (datetime.strptime(row['timestamp'], '%Y-%m-%dT%H:%M:%S%z')).strftime("%Y-%m-%d %H:%M")
+                timestamp = (datetime.strptime(
+                    row['timestamp'], '%Y-%m-%dT%H:%M:%S%z')).strftime("%Y-%m-%d %H:%M")
 
                 hashag_post_data.append({
                     'media_url': row['media_url'],
@@ -248,3 +464,118 @@ class AccountView(APIView):
         }
 
         return Response(account_data)
+
+
+# アカウント情報取得
+class AccountInfoView(APIView):
+    def get(self, request):
+        userProfile = request.GET.get(key="userProfile")
+        params = get_profile_data(userProfile)
+        response_data = {}
+
+        if params['access_token']:
+            params['limit'] = '8'
+            response = get_account_info(params)
+            if response:
+                response_data = response['json_data']
+
+        return Response(response_data)
+
+
+# メディアインサイト取得
+class MediaInsightsView(APIView):
+    def get(self, request):
+        userProfile = request.GET.get(key="userProfile")
+        media_id = request.GET.get(key="media_id")
+        params = get_profile_data(userProfile)
+        params['media_id'] = media_id
+
+        response_data = {}
+        response = get_media_insights(params)
+        if response:
+            response_data = response['json_data']
+
+        return Response(response_data)
+
+
+# ユーザーインサイト取得
+class UserInsightsView(APIView):
+    def get(self, request):
+        userProfile = request.GET.get(key="userProfile")
+        since = request.GET.get(key="since")
+        until = request.GET.get(key="until")
+        params = get_profile_data(userProfile)
+        params['since'] = since
+        params['until'] = until
+
+        response_data = {}
+        response = get_user_insights(params)
+        if response:
+            response_data = response['json_data']
+
+        return Response(response_data)
+
+
+# オンラインフォロワーインサイト取得
+class OnlineFollowersInsightsView(APIView):
+    def get(self, request):
+        userProfile = request.GET.get(key="userProfile")
+        since = request.GET.get(key="since")
+        until = request.GET.get(key="until")
+        params = get_profile_data(userProfile)
+        params['since'] = since
+        params['until'] = until
+
+        response_data = {}
+        response = get_online_followers_insights(params)
+        if response:
+            response_data = response['json_data']
+
+        return Response(response_data)
+
+
+# オーディエンスインサイト取得
+class AudienceInsightsView(APIView):
+    def get(self, request):
+        userProfile = request.GET.get(key="userProfile")
+        params = get_profile_data(userProfile)
+
+        response_data = {}
+        response = get_audience_insights(params)
+        if response:
+            response_data = response['json_data']
+
+        return Response(response_data)
+
+
+# ストーリー情報取得
+class StoriesInfoView(APIView):
+    def get(self, request):
+        userProfile = request.GET.get(key="userProfile")
+        params = get_profile_data(userProfile)
+
+        strories_data = get_stories(params)['json_data']['data']
+
+        stories_insights_data = []
+        for data in strories_data:
+            params['media_id'] = data['id']
+            media_data = get_media_info(params)['json_data']
+            media_insights_data = get_story_media_insights(params)['json_data']['data']
+            timestamp = timezone.localtime(datetime.strptime(media_data['timestamp'], '%Y-%m-%dT%H:%M:%S%z'))
+            timestamp = timestamp.strftime("%Y-%m-%d %H:%M")
+
+            stories_insights_data.append({
+                'id': media_data['id'],
+                'caption': media_data['caption'] if media_data.get('caption') else '',
+                'media_type': media_data['media_type'],
+                'media_url': media_data['media_url'],
+                'timestamp': timestamp,
+                'impressions': media_insights_data[0]['values'][0]['value'],
+                'reach': media_insights_data[1]['values'][0]['value'],
+                'replies': media_insights_data[2]['values'][0]['value'],
+                'taps_forward': media_insights_data[3]['values'][0]['value'],
+                'taps_back': media_insights_data[4]['values'][0]['value'],
+                'exits': media_insights_data[5]['values'][0]['value'],
+            })
+
+        return Response(stories_insights_data)
