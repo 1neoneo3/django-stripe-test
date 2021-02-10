@@ -38,7 +38,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 class Benchmark(models.Model):
     name = models.CharField(max_length=100)
-    profile_picture_url = models.CharField(max_length=200)
+    profile_picture_url = models.CharField(max_length=400)
     followers_count = models.CharField(max_length=100)
     media_count = models.CharField(max_length=100)
 
@@ -49,7 +49,7 @@ class Benchmark(models.Model):
 class Profile(models.Model):
     userProfile = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='userProfile', on_delete=models.CASCADE)
     nickName = models.CharField(max_length=100, blank=True, null=True)
-    accessToken = models.CharField(max_length=400, blank=True, null=True)
+    accessToken = models.CharField(max_length=200, blank=True, null=True)
     instagramBusinessID = models.CharField(max_length=100, blank=True, null=True)
     created_on = models.DateTimeField(auto_now_add=True)
     benchmark = models.ManyToManyField(Benchmark, blank=True, verbose_name='ベンチマーク')
