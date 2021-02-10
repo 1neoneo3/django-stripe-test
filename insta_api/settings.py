@@ -153,6 +153,7 @@ except ImportError:
 if DEBUG:
     CORS_ORIGIN_WHITELIST = ['http://localhost:3000']
 else:
+    DEBUG = True
     import django_heroku
     CORS_ORIGIN_WHITELIST = ['https://insta-analytics-841ef.web.app']
     django_heroku.settings(locals())
