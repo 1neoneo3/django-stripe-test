@@ -10,3 +10,4 @@ gunicorn~=20.0.4
 pandas
 requests
 dj-database-url~=0.5.0
+PyJWT==1.7.1
