@@ -11,7 +11,7 @@ urlpatterns = [
     path('myprofile/', views.MyProfileListView.as_view(), name='myprofile'),
 
     path('token/', views.TokenView.as_view(), name='token'),
-    path('tokenbeta/', views.TokenView.as_view(), name='tokenbeta'), # アプリレビューするまで仮
+    path('tokenbeta/', views.TokenBetaView.as_view(), name='tokenbeta'), # アプリレビューするまで仮
     path('search/', views.SearchView.as_view(), name='search'),
     path('account/', views.AccountView.as_view(), name='account'),
     path('accountinfo/', views.AccountInfoView.as_view(), name='accountinfo'),
