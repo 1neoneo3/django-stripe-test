@@ -46,6 +46,26 @@ class Benchmark(models.Model):
         return self.name
 
 
+class Pricing(models.Model):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField()
+    price = models.IntegerField()
+
+    def __str__(self):
+        return self.name
+
+
+def get_or_create_pricing():
+    pricing, _ = Pricing.objects.get_or_create(
+        name='スタンダードプラン',
+        defaults={
+            'slug': 'standard',
+            'price': 0
+        }
+    )
+    return pricing.id
+
+
 class Profile(models.Model):
     userProfile = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='userProfile', on_delete=models.CASCADE)
     nickName = models.CharField(max_length=100, blank=True, null=True)
@@ -53,6 +73,7 @@ class Profile(models.Model):
     instagramBusinessID = models.CharField(max_length=100, blank=True, null=True)
     created_on = models.DateTimeField(auto_now_add=True)
     benchmark = models.ManyToManyField(Benchmark, blank=True, verbose_name='ベンチマーク')
+    pricing = models.ForeignKey(Pricing, on_delete=models.CASCADE, related_name='pricing', default=get_or_create_pricing)
 
     def __str__(self):
         return self.userProfile.email

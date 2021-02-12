@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.shortcuts import render
 from django.contrib.auth.models import User
 
-from .models import Tag, Search, Profile, Benchmark
+from .models import Tag, Search, Profile, Benchmark, Pricing
 from datetime import datetime, timedelta
 
 from rest_framework.views import APIView
@@ -579,3 +579,16 @@ class StoriesInfoView(APIView):
             })
 
         return Response(stories_insights_data)
+
+
+# プラン変更
+class PlanView(APIView):
+    def get(self, request):
+        userProfile = request.GET.get(key="userProfile")
+        plan = request.GET.get(key="plan")
+        profile_data = Profile.objects.get(userProfile=userProfile)
+        pricing_data = Pricing.objects.get(slug=plan)
+        profile_data.pricing = pricing_data
+        profile_data.save()
+
+        return Response({})

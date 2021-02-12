@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Tag, Search, Profile, Benchmark
+from .models import Tag, Search, Profile, Benchmark, Pricing
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -20,15 +20,21 @@ class BenchmarkSerializer(serializers.ModelSerializer):
         fields = ('name', 'profile_picture_url', 'followers_count', 'media_count')
 
 
+class PricingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Pricing
+        fields = ('name', 'price')
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     created_on = serializers.DateTimeField(format='%Y-%m-%d', read_only=True)
     benchmark = BenchmarkSerializer(many=True, read_only=True)
+    pricing = PricingSerializer(read_only=True)
 
     class Meta:
         model = Profile
-        fields = ('id', 'nickName', 'userProfile', 'accessToken', 'instagramBusinessID', 'created_on', 'benchmark')
+        fields = ('id', 'nickName', 'userProfile', 'accessToken', 'instagramBusinessID', 'created_on', 'benchmark', 'pricing')
         extra_kwargs = {'userProfile': {'read_only': True}}
-
 
 
 class TagSerializer(serializers.ModelSerializer):
