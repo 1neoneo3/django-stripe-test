@@ -442,7 +442,7 @@ class AccountView(APIView):
 
             if average_eng:
                 average_eng = int(average_eng / val)
-                average_eng_percent = round(average_eng / follows_count, 1)
+                average_eng_percent = round(average_eng / followers_count, 1)
 
             hashtag_data.append({
                 'hashtag': key,
