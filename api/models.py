@@ -46,6 +46,13 @@ class Benchmark(models.Model):
         return self.name
 
 
+class Hashtag(models.Model):
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.name
+
+
 class Pricing(models.Model):
     name = models.CharField(max_length=100)
     slug = models.SlugField()
@@ -73,6 +80,7 @@ class Profile(models.Model):
     instagramBusinessID = models.CharField(max_length=100, blank=True, null=True)
     created_on = models.DateTimeField(auto_now_add=True)
     benchmark = models.ManyToManyField(Benchmark, blank=True, verbose_name='ベンチマーク')
+    hashtag = models.ManyToManyField(Hashtag, blank=True, verbose_name='ハッシュタグ')
     pricing = models.ForeignKey(Pricing, on_delete=models.CASCADE, related_name='pricing', default=get_or_create_pricing)
 
     def __str__(self):

@@ -21,4 +21,7 @@ urlpatterns = [
     path('audienceinsights/', views.AudienceInsightsView.as_view(), name='audienceinsights'),
     path('storiesinfo/', views.StoriesInfoView.as_view(), name='storiesinfo'),
     path('plan/', views.PlanView.as_view(), name='plan'),
+    path('registerhashtag/', views.RegisterHashtagView.as_view(), name='registerhashtag'),
+    path('deletehashtag/', views.DeleteHashtagView.as_view(), name='deletehashtag'),
+    path('analyticshashtag/', views.AnalyticsHashtagView.as_view(), name='analyticshashtag'),
 ]

@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.shortcuts import render
 from django.contrib.auth.models import User
 
-from .models import Tag, Search, Profile, Benchmark, Pricing
+from .models import Tag, Search, Profile, Benchmark, Pricing, Hashtag
 from datetime import datetime, timedelta
 
 from rest_framework.views import APIView
@@ -17,7 +17,7 @@ import json
 import numpy as np
 import itertools
 import re
-
+import math
 
 # ユーザー作成
 class CreateUserView(generics.CreateAPIView):
@@ -112,7 +112,7 @@ def get_hashtag_id(params):
 def get_hashtag_media(params):
     endpoint_params = {}
     endpoint_params['user_id'] = params['instagram_account_id']
-    endpoint_params['fields'] = 'caption,comments_count,like_count,media_url,permalink'
+    endpoint_params['fields'] = 'caption,comments_count,like_count,media_url,permalink,media_type,children{media_url}'
     endpoint_params['access_token'] = params['access_token']
     url = params['endpoint_base'] + params['hashtag_id'] + '/top_media'
     return call_api(url, endpoint_params)
@@ -477,7 +477,22 @@ class AccountInfoView(APIView):
             params['limit'] = '8'
             response = get_account_info(params)
             if response:
-                response_data = response['json_data']
+                response_data = response['json_data']['business_discovery']
+
+                business_discovery = response['json_data']['business_discovery']
+                media_data = business_discovery['media']['data']
+
+                # 自分の投稿の平均エンゲージメント数を取得
+                engagement = 0
+                for i in range(int(params['limit'])):
+                    if media_data[i].get('media_url'):
+                        engagement += media_data[i]['like_count'] + media_data[i]['comments_count']
+                try:
+                    my_eng_ave = math.floor(engagement / len(media_data))
+                except ZeroDivisionError:
+                    my_eng_ave = 0
+
+                response_data['my_eng_ave'] = my_eng_ave
 
         return Response(response_data)
 
@@ -592,3 +607,97 @@ class PlanView(APIView):
         profile_data.save()
 
         return Response({})
+
+
+# ハッシュタグ登録
+class RegisterHashtagView(APIView):
+    def get(self, request):
+        userProfile = request.GET.get(key="userProfile")
+        hashtag = request.GET.get(key="hashtag")
+        profile_data = Profile.objects.get(userProfile=userProfile)
+
+        hashtag_data, _ = Hashtag.objects.get_or_create(name=hashtag)
+
+        if not hashtag_data in profile_data.hashtag.all():
+            profile_data.hashtag.add(hashtag_data)
+            profile_data.save()
+
+        return Response({})
+
+
+# ハッシュタグ削除
+class DeleteHashtagView(APIView):
+    def get(self, request):
+        userProfile = request.GET.get(key="userProfile")
+        hashtag = request.GET.get(key="hashtag")
+        profile_data = Profile.objects.get(userProfile=userProfile)
+
+        hashtag_data = Hashtag.objects.get(name=hashtag)
+
+        profile_data.hashtag.remove(hashtag_data)
+        profile_data.save()
+
+        return Response({})
+
+
+# ハッシュタグ分析
+class AnalyticsHashtagView(APIView):
+    # リストの中で対象値と一番近い要素のインデックス取得
+    def get_nearest_value(self, list, num):
+        idx = np.abs(np.asarray(list) - num).argmin()
+        return idx
+
+    def get(self, request):
+        userProfile = request.GET.get(key="userProfile")
+        eng = request.GET.get(key="eng")
+
+        params = get_credentials()
+        profile_data = Profile.objects.get(userProfile=userProfile)
+        params['access_token'] = profile_data.accessToken
+        params['instagram_account_id'] = profile_data.instagramBusinessID
+        params['ig_username'] = profile_data.nickName
+
+        response_data = []
+
+        hashtag_list = profile_data.hashtag.all()
+
+        for tagname in hashtag_list:
+            params['tagname'] = tagname.name
+            params['hashtag_id'] = get_hashtag_id(params)['json_data']['data'][0]['id']
+
+            # トップメディアのエンゲージメント数のリストを作成
+            hashtag_media_response = get_hashtag_media(params)
+
+            if 'json_data' in hashtag_media_response:
+                hashag_data = hashtag_media_response['json_data']["data"]
+                length = len(hashag_data)
+                engage_list = [hashag_data[i]['comments_count'] + hashag_data[i]['like_count'] for i in range(length)]
+
+                # 自分の投稿の平均エンゲージメント数と一番近い値のタグリストを取得
+                for i in range(len(engage_list)):
+                    idx = self.get_nearest_value(engage_list, int(eng))
+                    caption = hashag_data[idx]["caption"]
+                    hash_tag_list = re.findall('#([^\s→#\ufeff]*)', caption)
+                    if hash_tag_list:
+                        break
+                    else:
+                        del engage_list[idx]
+                        continue
+                try:
+                    if hashag_data[idx]['media_type'] == 'CAROUSEL_ALBUM':
+                        media_url = hashag_data[idx]['children']['data'][0]['media_url']
+                    else:
+                        media_url = hashag_data[idx]['media_url']
+                except:
+                    media_url = 'http://placehold.jp/500x500.png?text=No Image'
+
+                response_data.append({
+                    'tagname': tagname.name,
+                    'permalink': hashag_data[idx]['permalink'],
+                    'media_url': media_url,
+                    'like_count': hashag_data[idx]['like_count'],
+                    'comments_count': hashag_data[idx]['comments_count'],
+                    'hash_tag_list': hash_tag_list,
+                })
+
+        return Response(response_data)

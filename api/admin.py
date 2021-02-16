@@ -3,7 +3,7 @@ from .models import Tag, Search, Profile
 
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext as _
-from .models import Tag, Search, Profile, User, Benchmark, Pricing
+from .models import Tag, Search, Profile, User, Benchmark, Pricing, Hashtag
 
 
 class UserAdmin(BaseUserAdmin):
@@ -38,3 +38,4 @@ admin.site.register(Profile)
 admin.site.register(Tag)
 admin.site.register(Search)
 admin.site.register(Pricing)
+admin.site.register(Hashtag)
