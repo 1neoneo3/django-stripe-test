@@ -24,4 +24,5 @@ urlpatterns = [
     path('registerhashtag/', views.RegisterHashtagView.as_view(), name='registerhashtag'),
     path('deletehashtag/', views.DeleteHashtagView.as_view(), name='deletehashtag'),
     path('analyticshashtag/', views.AnalyticsHashtagView.as_view(), name='analyticshashtag'),
+    path('checkout/',views.IndexView.as_view(), name="index"),
 ]

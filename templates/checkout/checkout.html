@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% load i18n static %}
+{% block title %}Checkout_test{% endblock title %}
+
+{% block additional_script %}
+<script src="https://js.stripe.com/v3/"></script>
+<script src="{% staticfiles 'checkout/js/script.js' %}"></script>
+{% endblock additional_script%}
+
+
+{% block content %}
+<div>
+    <h1 data-i18n="headline"></h1>
+    <h4 data-i18n="subline"></h4>
+    <div class="pasha-image">
+      <img
+        src="https://picsum.photos/280/320?random=4"
+        width="140"
+        height="160"
+      />
+    </div>
+  </div>
+  <div class="quantity-setter">
+    <input type="number" id="quantity-input" min="1" max="2" value="1" />
+  </div>
+  <p class="sr-legal-text" data-i18n="sr-legal-text"></p>
+
+  {% csrf_token %}
+  <button
+    id="submit"
+  >PAYMENT</button>
+</section>
+<div id="error-message"></div>
+</div>
+{% endblock content %}

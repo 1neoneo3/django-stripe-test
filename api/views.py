@@ -2,6 +2,12 @@ from django.conf import settings
 from django.utils import timezone
 from django.shortcuts import render
 from django.contrib.auth.models import User
+from django.views import generic
+from django.shortcuts import render
+
+import stripe
+from django.http.response import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import Tag, Search, Profile, Benchmark, Pricing, Hashtag
 from datetime import datetime, timedelta
@@ -701,3 +707,43 @@ class AnalyticsHashtagView(APIView):
                 })
 
         return Response(response_data)
+    
+    
+class IndexView(generic.TemplateView):
+    template_name = "checkout/checkout_test.html"
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name )    
+
+
+logger = logging.getLogger(__name__)
+
+
+@csrf_exempt
+def onetime_payment_checkout(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        domain_url = os.getenv('DOMAIN')
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        try:
+            # Create new Checkout Session for the order
+            # ?session_id={CHECKOUT_SESSION_ID} means the redirect will have the session ID set as a query param
+            checkout_session = stripe.checkout.Session.create(
+                success_url=domain_url +
+                "checkout/success?session_id={CHECKOUT_SESSION_ID}",
+                cancel_url=domain_url + "checkout/canceled/",
+                payment_method_types=["card"],
+                line_items=[
+                    {
+                        "name": "Pasha photo",
+                        "images": ["https://picsum.photos/300/300?random=4"],
+                        "quantity": data['quantity'],
+                        "currency": os.getenv('CURRENCY'),
+                        "amount": os.getenv('BASE_PRICE'),
+                    }
+                ]
+            )
+            logger.debug( str(checkout_session))
+            return JsonResponse({'sessionId': checkout_session['id']})
+        except Exception as e:
+            logger.warning( str(e) )
+            return JsonResponse({'error':str(e)})
